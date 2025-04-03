@@ -2,6 +2,7 @@ import telebot
 import config
 from telebot import types  # для указание типов
 import random
+import math
 
 bot = telebot.TeleBot(config.TG_API_CONFIG)
 jokes = [
@@ -72,10 +73,28 @@ arr = {
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call: types.CallbackQuery):
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
+
+    if call.data == "correct":
+        # bot.edit_message_reply_markup(
+        #     chat_id=chat_id, message_id=message_id, reply_markup=None
+        # )
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=call.message.text.replace("\nВыберите правильные корни:", ""),
+            reply_markup=None,
+        )
+        bot.answer_callback_query(call.id, "✅ Верно! Еще пример.", show_alert=False)
+        quadratic_equation(call.message)
+    if "wrong_" in call.data:
+        bot.answer_callback_query(
+            call.id, "❌ Неверно! Попробуйте еще раз.", show_alert=False
+        )
     if call.data == "1":
         get_joke(call.message)
     if call.data in arr:
-        print(arr[call.data])
         bot.reply_to(call.message, arr[call.data])
 
 
@@ -163,38 +182,105 @@ def send_random(message):
     bot.reply_to(message, random.randint(1, 3))
 
 
+def simplify_equation(a, b, c):
+    # Находим наибольший общий делитель коэффициентов
+    common_divisor = math.gcd(math.gcd(abs(a), abs(b)), abs(c))
+    if common_divisor > 1:
+        a //= common_divisor
+        b //= common_divisor
+        c //= common_divisor
+    return a, b, c
+
+
 @bot.message_handler(commands=["math"])
-def get_math(message: telebot.types.Message):
-    # Выбираем случайную операцию
-    operation = random.choice(["+", "-", "*", "/"])
+def quadratic_equation(message: telebot.types.Message):
+    # Генерируем целые корни
+    x1 = random.randint(-10, 10)
+    x2 = random.randint(-10, 10)
 
-    N1 = random.randint(1, 100)
-    N2 = random.randint(1, 100)
+    # Раскрываем скобки (x - x1)(x - x2) = 0 → ax² + bx + c = 0
+    a = 1
+    b = -(x1 + x2)
+    c = x1 * x2
 
-    # Генерируем уравнение и вычисляем ответ
-    if operation == "+":
-        problem = f"{N1} + {N2} = ?"
-        answer = N1 + N2
-    elif operation == "-":
-        problem = f"{N1} - {N2} = ?"
-        answer = N1 - N2
-    elif operation == "*":
-        problem = f"{N1} * {N2} = ?"
-        answer = N1 * N2
-    elif operation == "/":
-        # Для деления делаем результат целым, чтобы было проще
-        N2 = random.randint(1, 10)  # Ограничиваем делитель
-        N1 = N2 * random.randint(1, 10)  # Чтобы делилось без остатка
-        problem = f"{N1} / {N2} = ?"
-        answer = N1 // N2
+    # Упрощаем уравнение
+    a, b, c = simplify_equation(a, b, c)
 
-    # Отправляем сообщение с разметкой (экранируем символы для MarkdownV2)
-    escaped_problem = problem.replace("*", "\*").replace("-", "\-").replace(".", "\.")
-    bot.reply_to(
-        message,
-        f"Реши пример:\n`{escaped_problem}`\n\nОтвет: ||{answer}||",
-        parse_mode="MarkdownV2",
+    # Форматируем уравнение
+    equation_parts = []
+    if a == 1:
+        equation_parts.append("x²")
+    elif a == -1:
+        equation_parts.append("-x²")
+    else:
+        equation_parts.append(f"{a}x²")
+
+    if b != 0:
+        sign_b = "+" if b > 0 else "-"
+        abs_b = abs(b)
+        if abs_b == 1:
+            equation_parts.append(f" {sign_b} x")
+        else:
+            equation_parts.append(f" {sign_b} {abs_b}x")
+
+    if c != 0:
+        sign_c = "+" if c > 0 else "-"
+        equation_parts.append(f" {sign_c} {abs(c)}")
+
+    equation = "".join(equation_parts) + " = 0"
+
+    # Создаем варианты ответов
+    correct_answer = sorted([x1, x2])
+    options = [correct_answer]
+
+    # Генерируем 3 неправильных варианта
+    while len(options) < 4:
+        wrong_x1 = random.randint(-10, 10)
+        wrong_x2 = random.randint(-10, 10)
+        wrong_answer = sorted([wrong_x1, wrong_x2])
+        if wrong_answer not in options:
+            options.append(wrong_answer)
+
+    # Перемешиваем варианты
+    random.shuffle(options)
+
+    # Создаем клавиатуру
+    markup = types.InlineKeyboardMarkup()
+    for i, option in enumerate(options):
+        text = (
+            f"x₁={option[0]}, x₂={option[1]}"
+            if option[0] != option[1]
+            else f"x={option[0]}"
+        )
+        if option == correct_answer:
+            callback_data = "correct"
+        else:
+            callback_data = f"wrong_{i}"
+        markup.add(types.InlineKeyboardButton(text=text, callback_data=callback_data))
+
+    # Отправляем сообщение
+    escaped_equation = (
+        equation.replace("*", "×")
+        .replace("-", "\-")
+        .replace("+", "\+")
+        .replace("=", "\=")
     )
+
+    msg = bot.send_message(
+        message.chat.id,
+        f"Решите уравнение:\n`{escaped_equation}`\n\nВыберите правильные корни:",
+        parse_mode="MarkdownV2",
+        reply_markup=markup,
+    )
+
+    # Сохраняем ID сообщения и правильный ответ для обработки callback
+    bot.register_next_step_handler(
+        msg, lambda m: None
+    )  # Фиктивный хендлер, чтобы избежать ошибок
+    bot._chat_data[msg.chat.id] = {
+        "message_id": msg.message_id,
+        "correct_answer": correct_answer,
+    }
 
 
 @bot.message_handler(func=lambda message: True)
