@@ -57,24 +57,48 @@ jokes = [
     "— Почему программисты не любят арифметику? — Потому что 2 + 2 = 5 для очень больших значений 2.",
 ]
 
-
-@bot.message_handler(commands=["start", "help"])
-def send_welcome(message):
-    bot.reply_to(message, "Howdy, how are you doing?")
+arr = {
+    "start": "Подробная информация о том что делает команда /start",
+    "help": "Подробная информация о том что делает команда /help",
+    "golinks": "Подробная информация о том что делает команда /golinks",
+    "getreplybuttons": "Подробная информация о том что делает команда /getreplybuttons",
+    "getinfouser": "Подробная информация о том что делает команда /getinfouser",
+    "about": "Подробная информация о том что делает команда /about",
+    "joke": "Подробная информация о том что делает команда /joke",
+    "getrarandom": "Подробная информация о том что делает команда /getrarandom",
+    "math": "Подробная информация о том что делает команда /math",
+}
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call: types.CallbackQuery):
     if call.data == "1":
         get_joke(call.message)
+    if call.data in arr:
+        print(arr[call.data])
+        bot.reply_to(call.message, arr[call.data])
+
+
+@bot.message_handler(commands=["start", "help"])
+def send_welcome(message: telebot.types.Message):
+    markup = types.InlineKeyboardMarkup()
+
+    for item in arr:
+        markup.add(types.InlineKeyboardButton(item, callback_data=item))
+
+    bot.send_message(
+        message.chat.id,
+        text="Привет, {0.first_name}! Вот команды которые мне доступны, нажми что бы получить описание".format(
+            message.from_user
+        ),
+        reply_markup=markup,
+    )
 
 
 @bot.message_handler(commands=["golinks"])
 def get_links(message):
     markup = types.InlineKeyboardMarkup()
-    button0 = types.InlineKeyboardButton(
-        "Дать шутку", callback_data="1"
-    )
+    button0 = types.InlineKeyboardButton("Дать шутку", callback_data="1")
     button1 = types.InlineKeyboardButton(
         "Сайт Moodle", url="https://moodle.ntiustu.ru/mod/assign/view.php?id=4015"
     )
@@ -111,7 +135,15 @@ def get_info(message: telebot.types.Message):
 
 @bot.message_handler(commands=["about"])
 def get_about(message: telebot.types.Message):
-    bot.reply_to(message, "Я D1M0N, и я сделал этого бота с помощью telebot")
+    markup = types.InlineKeyboardMarkup()
+    btnTG = types.InlineKeyboardButton("GitHub", url="https://github.com/DimaBatalin")
+    btnVK = types.InlineKeyboardButton("VK", url="https://vk.com/dimabatalin")
+    markup.add(btnTG, btnVK)
+    bot.send_message(
+        message.chat.id,
+        "Я @D1M0N02, и я сделал этого бота с помощью telebot",
+        reply_markup=markup,
+    )
 
 
 @bot.message_handler(commands=["joke"])
