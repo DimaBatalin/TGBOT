@@ -1,5 +1,6 @@
 import telebot
 import config
+from telebot import types  # для указание типов
 import random
 
 bot = telebot.TeleBot(config.TG_API_CONFIG)
@@ -53,12 +54,54 @@ jokes = [
     "— Как программист называет свою собаку? — 'Лучший друг человека.exe'.",
     "— Почему программисты не любят завтракать? — Потому что у них нет утреннего 'стартапа'.",
     "— Что сказал один баг другому? — 'Давай спрячемся в коде, а то нас сейчас пофиксят!'",
-    "— Почему программисты не любят арифметику? — Потому что 2 + 2 = 5 для очень больших значений 2."
+    "— Почему программисты не любят арифметику? — Потому что 2 + 2 = 5 для очень больших значений 2.",
 ]
+
 
 @bot.message_handler(commands=["start", "help"])
 def send_welcome(message):
     bot.reply_to(message, "Howdy, how are you doing?")
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call: types.CallbackQuery):
+    if call.data == "1":
+        get_joke(call.message)
+
+
+@bot.message_handler(commands=["golinks"])
+def get_links(message):
+    markup = types.InlineKeyboardMarkup()
+    button0 = types.InlineKeyboardButton(
+        "Дать шутку", callback_data="1"
+    )
+    button1 = types.InlineKeyboardButton(
+        "Сайт Moodle", url="https://moodle.ntiustu.ru/mod/assign/view.php?id=4015"
+    )
+    button2 = types.InlineKeyboardButton(
+        "Сайт Talk", url="https://ntiurfu44.ktalk.ru/xsn3j3id436s"
+    )
+    markup.add(button0, button1, button2)
+    bot.send_message(
+        message.chat.id,
+        "Привет, {0.first_name}! Хочешь перейти по ссылке?".format(message.from_user),
+        reply_markup=markup,
+    )
+
+
+@bot.message_handler(commands=["getreplybuttons"])
+def get_reaply_buttons(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn1 = types.KeyboardButton("Привет")
+    btn2 = types.KeyboardButton("Ты работаешь?")
+    markup.add(btn1, btn2)
+    bot.send_message(
+        message.chat.id,
+        text="Привет, {0.first_name}! Я тестовый бот для твоей статьи для habr.com".format(
+            message.from_user
+        ),
+        reply_markup=markup,
+    )
 
 
 @bot.message_handler(commands=["getinfouser"])
@@ -85,10 +128,10 @@ def send_random(message):
 def get_math(message: telebot.types.Message):
     # Выбираем случайную операцию
     operation = random.choice(["+", "-", "*", "/"])
-    
+
     N1 = random.randint(1, 100)
     N2 = random.randint(1, 100)
-    
+
     # Генерируем уравнение и вычисляем ответ
     if operation == "+":
         problem = f"{N1} + {N2} = ?"
@@ -105,7 +148,7 @@ def get_math(message: telebot.types.Message):
         N1 = N2 * random.randint(1, 10)  # Чтобы делилось без остатка
         problem = f"{N1} / {N2} = ?"
         answer = N1 // N2
-    
+
     # Отправляем сообщение с разметкой (экранируем символы для MarkdownV2)
     escaped_problem = problem.replace("*", "\*").replace("-", "\-").replace(".", "\.")
     bot.reply_to(
@@ -113,6 +156,7 @@ def get_math(message: telebot.types.Message):
         f"Реши пример:\n`{escaped_problem}`\n\nОтвет: ||{answer}||",
         parse_mode="MarkdownV2",
     )
+
 
 @bot.message_handler(func=lambda message: True)
 def get_none(message):
