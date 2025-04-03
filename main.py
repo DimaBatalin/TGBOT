@@ -148,7 +148,14 @@ def get_about(message: telebot.types.Message):
 
 @bot.message_handler(commands=["joke"])
 def get_joke(message: telebot.types.Message):
-    bot.reply_to(message, jokes[random.randint(0, len(jokes) - 1)])
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Еще шутка?", callback_data="1"))
+
+    bot.send_message(
+        message.chat.id,
+        text=jokes[random.randint(0, len(jokes) - 1)].format(message.from_user),
+        reply_markup=markup,
+    )
 
 
 @bot.message_handler(commands=["getrarandom"])
